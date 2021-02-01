@@ -68,6 +68,8 @@ export function add(
   return false
 }
 
+export default add
+
 /**
  * Add rule config before the rule that matched the loader.
  * @param config
