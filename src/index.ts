@@ -1,6 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs'
-import type webpack from 'webpack'
+import * as webpack from 'webpack'
 
 interface RuleLoaderItem {
   loader: string
@@ -10,6 +10,12 @@ interface RuleLoaderItem {
   rule: webpack.RuleSetRule
   siblings: webpack.RuleSetRule[] | webpack.RuleSetUseItem[]
 }
+
+type NewRuleItems =
+  | webpack.RuleSetRule
+  | webpack.RuleSetRule[]
+  | webpack.RuleSetUseItem
+  | webpack.RuleSetUseItem[]
 
 type FindMatcher = (item: RuleLoaderItem) => boolean
 
@@ -34,10 +40,7 @@ export type PositionHandler = (
   isOneOf: boolean
 ) => number
 
-export type NewRule =
-  | webpack.RuleSetRule
-  | webpack.RuleSetUseItem
-  | ((isUseItem: boolean, isOneOf: boolean) => webpack.RuleSetRule | webpack.RuleSetUseItem)
+export type NewRule = NewRuleItems | ((isUseItem: boolean, isOneOf: boolean) => NewRuleItems)
 
 /**
  * Find the rules that has an loader matched.
