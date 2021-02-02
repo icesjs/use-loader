@@ -69,7 +69,7 @@ export function find(config: webpack.Configuration, match: string | Matcher) {
  * Match the rules that has an loader matched, then add the new rule to the position inside matched rule list.
  * @param config webpack config
  * @param matcher a function to match the loader
- * @param newRule a rule config to add
+ * @param newRule a rule or rule list to add
  * @param position if position handler return -1, this rule will not be add
  */
 export function add(
@@ -83,7 +83,7 @@ export function add(
     for (const { siblings, index, isUseItem, isOneOf } of matched) {
       const pos = getPosition(position, index, siblings.length, isUseItem, isOneOf)
       if (pos !== -1) {
-        siblings.splice(pos, 0, getNewRule(newRule, isUseItem, isOneOf) as any)
+        addNewLoader(newRule, siblings, pos, isUseItem, isOneOf)
       }
     }
   } else {
@@ -94,7 +94,7 @@ export function add(
     }
     const pos = getPosition(position, -1, rules.length, false, false)
     if (pos !== -1) {
-      rules.splice(pos, 0, getNewRule(newRule, false, false) as any)
+      addNewLoader(newRule, rules, pos, false, false)
     }
   }
 }
@@ -106,7 +106,7 @@ export default add
  * If there is no matched, the rule is added to the begin of the rules array.
  * @param config webpack configuration
  * @param match a function to match the loader
- * @param newRule a rule config to add
+ * @param newRule a rule or rule list to add
  */
 export function addBefore(
   config: webpack.Configuration,
@@ -121,7 +121,7 @@ export function addBefore(
  * If there is no matched, the rule is added to the end of the rules array.
  * @param config webpack configuration
  * @param match a function to match the loader
- * @param newRule a rule config to add
+ * @param newRule a rule or rule list to add
  */
 export function addAfter(config: webpack.Configuration, match: string | Matcher, newRule: NewRule) {
   return add(config, match, newRule, (...args) => (args[0] === -1 ? args[1] : args[0] + 1))
@@ -155,7 +155,21 @@ function getNewRule(newRule: NewRule, isUseItem: boolean, isOneOf: boolean) {
       throw new Error(`RuleSetRule must be an object`)
     }
   }
-  return rule
+  return rule as webpack.RuleSetRule | webpack.RuleSetUseItem
+}
+
+function addNewLoader(
+  newRule: NewRule,
+  rules: webpack.RuleSetRule[] | webpack.RuleSetUseItem[],
+  pos: number,
+  isUseItem: boolean,
+  isOneOf: boolean
+) {
+  let items = getNewRule(newRule, isUseItem, isOneOf) as any
+  if (!Array.isArray(items)) {
+    items = [items]
+  }
+  rules.splice(pos, 0, ...items)
 }
 
 function findLoaderRule(rules: webpack.RuleSetRule[], match: FindMatcher, isOneOf = false) {
