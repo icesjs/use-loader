@@ -42,6 +42,22 @@ export type PositionHandler = (
 
 export type NewRule = NewRuleItems | ((isUseItem: boolean, isOneOf: boolean) => NewRuleItems)
 
+export type RuleTestResource = {
+  resource?: string
+  realResource?: string
+  resourceQuery?: string
+  compiler?: webpack.Compiler
+  issuer?: string
+  [p: string]: any
+}
+
+export type CssRuleTestOptions = {
+  module?: boolean
+  onlyModule?: boolean
+  syntax?: string
+  data?: RuleTestResource
+}
+
 /**
  * Find the rules that has an loader matched.
  * @param config webpack configuration
@@ -102,8 +118,6 @@ export function add(
   }
 }
 
-export default add
-
 /**
  * Add rule config before the rule that matched the loader.
  * If there is no matched, the rule is added to the begin of the rules array.
@@ -128,6 +142,79 @@ export function addBefore(
  */
 export function addAfter(config: webpack.Configuration, match: string | Matcher, newRule: NewRule) {
   return add(config, match, newRule, (...args) => (args[0] === -1 ? args[1] : args[0] + 1))
+}
+
+/**
+ * Test a rule by some resources.
+ * @param rule the rule that need to be test
+ * @param resources resources for test the rule
+ */
+export function testByRuleSet(rule: webpack.RuleSetRule, resources: RuleTestResource[]) {
+  const notFound = 'MODULE_NOT_FOUND'
+  try {
+    let RuleSet
+    const lib = 'webpack/lib/RuleSet'
+    try {
+      RuleSet = require(lib)
+    } catch (err) {
+      if (err.code === notFound) {
+        RuleSet = require(require.resolve(lib, { paths: [process.cwd()] }))
+      }
+    }
+    const tester = new RuleSet([rule])
+    return resources.some((res) => {
+      const result = tester.exec(res)
+      if (Array.isArray(result)) {
+        return !!result.length
+      }
+      return !!result
+    })
+  } catch (err) {
+    if (err && err.code === notFound) {
+      const { test: regx } = rule
+      if (regx instanceof RegExp) {
+        return resources.some(({ resource }) => (resource ? regx.test(resource) : false))
+      }
+    }
+    return false
+  }
+}
+
+/**
+ * Determine whether the rule is a CSS rule.
+ * @param rule the rule that need to be test
+ * @param options some options for test
+ */
+export function isCssRule(rule: webpack.RuleSetRule, options?: CssRuleTestOptions) {
+  const { module = true, onlyModule = false, syntax, data } = Object.assign({}, options)
+  const filterBySyntax = (res: string) => (syntax ? res.endsWith(syntax) : !!res)
+  const resources = !onlyModule
+    ? ['x.scss', 'x.less', 'x.css', 'x.sass', syntax ? `x.${syntax}` : ''].filter(filterBySyntax)
+    : []
+  if (onlyModule || module) {
+    resources.push(
+      ...[
+        'x.module.scss',
+        'x.module.less',
+        'x.module.css',
+        'x.module.sass',
+        syntax ? `x.module.${syntax}` : '',
+      ].filter(filterBySyntax)
+    )
+  }
+  return testByRuleSet(
+    rule,
+    [...new Set(resources)].map((resource) => Object.assign({ resource }, data))
+  )
+}
+
+export default {
+  findLoader: find,
+  addLoader: add,
+  addLoaderBefore: addBefore,
+  addLoaderAfter: addAfter,
+  testByRuleSet,
+  isCssRule,
 }
 
 function getPosition(handler: PositionHandler, ...args: Parameters<PositionHandler>) {

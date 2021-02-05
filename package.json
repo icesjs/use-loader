@@ -1,6 +1,6 @@
 {
   "name": "@ices/use-loader",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Find and add loader to webpack config",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
