@@ -64,7 +64,7 @@ export type CssRuleTestOptions = {
  * @param match a function to match the loader
  * @param parentMatcher a function to match the parent rule, optional
  */
-export function find(
+export function findLoader(
   config: Configuration,
   match: string | Matcher,
   parentMatcher?: ParentMatcher | null
@@ -102,13 +102,13 @@ export function find(
  * @param newRule a rule or rule list to add
  * @param position if position handler return -1, this rule will not be add
  */
-export function add(
+export function addLoader(
   config: Configuration,
   matcher: string | Matcher,
   newRule: NewRule,
   position: PositionHandler
 ) {
-  const matched = find(config, matcher)
+  const matched = findLoader(config, matcher)
   if (matched.length) {
     for (const { siblings, index, isUseItem, isOneOf } of matched) {
       const pos = getPosition(position, index, siblings.length, isUseItem, isOneOf)
@@ -136,8 +136,8 @@ export function add(
  * @param match a function to match the loader
  * @param newRule a rule or rule list to add
  */
-export function addBefore(config: Configuration, match: string | Matcher, newRule: NewRule) {
-  return add(config, match, newRule, (x) => (x === -1 ? 0 : x))
+export function addLoaderBefore(config: Configuration, match: string | Matcher, newRule: NewRule) {
+  return addLoader(config, match, newRule, (x) => (x === -1 ? 0 : x))
 }
 
 /**
@@ -147,8 +147,8 @@ export function addBefore(config: Configuration, match: string | Matcher, newRul
  * @param match a function to match the loader
  * @param newRule a rule or rule list to add
  */
-export function addAfter(config: Configuration, match: string | Matcher, newRule: NewRule) {
-  return add(config, match, newRule, (...args) => (args[0] === -1 ? args[1] : args[0] + 1))
+export function addLoaderAfter(config: Configuration, match: string | Matcher, newRule: NewRule) {
+  return addLoader(config, match, newRule, (...args) => (args[0] === -1 ? args[1] : args[0] + 1))
 }
 
 /**
@@ -218,15 +218,6 @@ export function isCssRule(rule: RuleSetRule, options?: CssRuleTestOptions) {
     rule,
     [...new Set(resources)].map((resource) => Object.assign({ resource }, data))
   )
-}
-
-export default {
-  findLoader: find,
-  addLoader: add,
-  addLoaderBefore: addBefore,
-  addLoaderAfter: addAfter,
-  testByRuleSet,
-  isCssRule,
 }
 
 function getPosition(handler: PositionHandler, ...args: Parameters<PositionHandler>) {
