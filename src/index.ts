@@ -404,18 +404,24 @@ function matchRuleSet(options: MatchOptions, isOneOf: boolean) {
 }
 
 function getPackageName(file: string) {
-  let prev = ''
-  let dir = file
-  do {
-    if (dir === prev || path.basename(dir) === 'node_modules') {
-      return ''
+  if (!file || !path.isAbsolute(file)) {
+    return ''
+  }
+  const cwd = process.cwd()
+  while (!fs.existsSync(path.join((file = path.dirname(file)), 'package.json'))) {
+    if (file === cwd || path.basename(file) === 'node_modules') {
+      file = ''
+      break
     }
-    const desc = path.join(dir, 'package.json')
-    if (fs.existsSync(desc)) {
-      return require(desc).name
-    }
-    prev = dir
-  } while ((dir = path.dirname(dir)))
+  }
+  if (!file || path.dirname(file) === file) {
+    return ''
+  }
+  try {
+    return require(path.join(file, 'package.json')).name
+  } catch (e) {
+    return ''
+  }
 }
 
 function resolveLoaderPath(loaderPath: string) {
@@ -436,6 +442,9 @@ function isSamePath(x: string, y: string) {
 }
 
 function isSamePackage(x: string, y: string) {
+  if (x && y && x === y) {
+    return true
+  }
   if (path.basename(x) === path.basename(y)) {
     const xName = getPackageName(x)
     const yName = getPackageName(y)
