@@ -5,20 +5,18 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "downlevelIteration": true,
-    "importHelpers": false,
     "esModuleInterop": true,
+    "importHelpers": false,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "alwaysStrict": true,
     "allowJs": false,
-    "noUnusedLocals": true,
+    "noUnusedLocals": false,
     "removeComments": false,
-    "declaration": true,
+    "declaration": false,
     "outDir": "dist",
     "newLine": "lf",
-    "skipLibCheck": true,
-    "inlineSourceMap": true,
-    "inlineSources": true
+    "skipLibCheck": true
   },
   "include": ["src"]
 }
