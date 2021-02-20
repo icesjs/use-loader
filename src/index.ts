@@ -282,7 +282,7 @@ function findLoaderRule(
     const hasOneOf = Array.isArray(rule.oneOf) && !!rule.oneOf.length
     const hasRules = Array.isArray(rule.rules) && !!rule.rules.length
 
-    if ((hasOneOf || hasRules) && typeof parentMatch === 'function' && hasConditions(rule)) {
+    if ((hasOneOf || hasRules) && typeof parentMatch === 'function' && hasRuleConditions(rule)) {
       if (!parentMatch(rule, parent)) {
         continue
       }
@@ -303,7 +303,7 @@ function findLoaderRule(
   return matched
 }
 
-function hasConditions(rule: RuleSetRule) {
+export function hasRuleConditions(rule: RuleSetRule) {
   const isCondition = (item: any): boolean => {
     if (!item) {
       return false
