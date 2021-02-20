@@ -303,6 +303,10 @@ function findLoaderRule(
   return matched
 }
 
+/**
+ * Determine the rule has defined some conditions.
+ * @param rule the rule that need to be test.
+ */
 export function hasRuleConditions(rule: RuleSetRule) {
   const isCondition = (item: any): boolean => {
     if (!item) {
