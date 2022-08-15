@@ -1,15 +1,24 @@
 import * as path from 'path'
 import * as fs from 'fs'
-import { RuleSetRule, RuleSetUseItem, RuleSetUse, Compiler, Configuration } from 'webpack'
+import {
+  Compiler,
+  Configuration,
+  RuleSetLoader,
+  RuleSetRule,
+  RuleSetUse,
+  RuleSetUseItem,
+} from 'webpack'
 
-interface RuleLoaderItem {
-  loader: string
+interface RuleLoaderItem extends RuleSetLoader {
+  loader?: string
   index: number
   isUseItem: boolean
   isOneOf: boolean
   rule: RuleSetRule
   parent: RuleSetRule | null
   siblings: RuleSetRule[] | RuleSetUseItem[]
+  // webpack5
+  type?: string
 }
 
 type NewRuleItems = RuleSetRule | RuleSetRule[] | RuleSetUseItem | RuleSetUseItem[]
@@ -59,7 +68,7 @@ export type CssRuleTestOptions = {
 }
 
 /**
- * Find the rules that has an loader matched.
+ * Find the rules that has a loader matched.
  * @param config webpack configuration
  * @param match a function to match the loader
  * @param parentMatcher a function to match the parent rule, optional
@@ -77,7 +86,9 @@ export function findLoader(
   if (typeof match === 'string') {
     const loaderPath = resolveLoaderPath(match)
     const loaderName = getPackageName(loaderPath)
-    match = ({ loader, name }) => isSamePath(loaderPath, loader) || isSamePackage(loaderName, name)
+    match = ({ loader, name }) =>
+      typeof loader === 'string' &&
+      (isSamePath(loaderPath, loader) || isSamePackage(loaderName, name))
   } else if (typeof match !== 'function') {
     throw new Error('Arguments error: second argument is not a string or function')
   }
@@ -85,9 +96,13 @@ export function findLoader(
   return findLoaderRule(
     rules,
     ({ loader, ...rest }) => {
-      const absolutePath = resolveLoaderPath(loader)
+      const absolutePath = typeof loader === 'string' ? resolveLoaderPath(loader) : undefined
       const matcher = match as Matcher
-      return matcher({ ...rest, loader: absolutePath, name: getPackageName(absolutePath) })
+      return matcher({
+        ...rest,
+        loader: absolutePath,
+        name: absolutePath ? getPackageName(absolutePath) : '',
+      })
     },
     parentMatcher || null,
     null,
@@ -118,7 +133,7 @@ export function addLoader(
     }
   } else {
     const { module = { rules: [] } } = config
-    const { rules } = module
+    const { rules = [] } = module
     if (!config.module) {
       config.module = module
     }
@@ -155,6 +170,7 @@ export function addLoaderAfter(config: Configuration, match: string | Matcher, n
  * Test a rule by some resources.
  * @param rule the rule that need to be test
  * @param resources resources for test the rule
+ * @deprecated
  */
 export function testByRuleSet(rule: RuleSetRule, resources: RuleTestResource[]) {
   const notFound = 'MODULE_NOT_FOUND'
@@ -178,23 +194,28 @@ export function testByRuleSet(rule: RuleSetRule, resources: RuleTestResource[]) 
     })
   } catch (err) {
     if (err && err.code === notFound) {
-      const { test } = rule
-      const regx = (!Array.isArray(test) ? [test] : (test as Array<any>)).filter(
-        (reg: any) => reg && reg instanceof RegExp
-      ) as RegExp[]
-      if (regx.length) {
-        return resources.some(({ resource }) =>
-          resource ? regx.some((reg) => reg.test(resource)) : false
-        )
-      }
+      return testByRegExp(rule, resources)
     }
     return false
   }
 }
 
+function testByRegExp(rule: RuleSetRule, resources: RuleTestResource[]) {
+  const { test } = rule
+  const regx = (!Array.isArray(test) ? [test] : (test as Array<any>)).filter(
+    (reg: any) => reg && reg instanceof RegExp
+  ) as RegExp[]
+  if (regx.length) {
+    return resources.some(({ resource }) =>
+      resource ? regx.some((reg) => reg.test(resource)) : false
+    )
+  }
+  return false
+}
+
 /**
  * Determine whether the rule is a CSS rule.
- * @param rule the rule that need to be test
+ * @param rule the rule that need to be tested
  * @param options some options for test
  */
 export function isCssRule(rule: RuleSetRule, options?: CssRuleTestOptions) {
@@ -214,7 +235,7 @@ export function isCssRule(rule: RuleSetRule, options?: CssRuleTestOptions) {
       ].filter(filterBySyntax)
     )
   }
-  return testByRuleSet(
+  return testByRegExp(
     rule,
     [...new Set(resources)].map((resource) => Object.assign({ resource }, data))
   )
@@ -288,7 +309,7 @@ function findLoaderRule(
       }
     }
 
-    for (const use of [rule.loader, rule.use, rule.loaders]) {
+    for (const use of [rule.loader, rule.use, rule.loaders, rule.type]) {
       matched.push(...matchRuleSet({ use, siblings: rules, match, rule, parent, index }, isOneOf))
     }
 
@@ -305,7 +326,7 @@ function findLoaderRule(
 
 /**
  * Determine the rule has defined some conditions.
- * @param rule the rule that need to be test.
+ * @param rule the rule that need to be tested.
  */
 export function hasRuleConditions(rule: RuleSetRule) {
   const isCondition = (item: any): boolean => {
@@ -332,7 +353,8 @@ export function hasRuleConditions(rule: RuleSetRule) {
     isCondition(rule.resourceQuery) ||
     isCondition(rule.resource) ||
     isCondition(rule.issuer) ||
-    isCondition(rule.compiler)
+    isCondition(rule.compiler) ||
+    isCondition(rule.type)
   )
 }
 
@@ -362,45 +384,40 @@ function matchRuleSet(options: MatchOptions, isOneOf: boolean) {
         }
       } else if (typeof useItem === 'object') {
         // RuleSetLoader
-        const ruleSetLoader = useItem.loader
-        if (typeof ruleSetLoader === 'string') {
-          const item = {
-            rule,
-            parent,
-            index,
-            loader: ruleSetLoader,
-            isUseItem: true,
-            isOneOf: false,
-            siblings: use,
-          }
-          if (match({ ...item })) {
-            matched.push(item)
-          }
+        const item = {
+          ...useItem,
+          rule,
+          parent,
+          index,
+          isUseItem: true,
+          isOneOf: false,
+          siblings: use,
+        }
+        if (match({ ...item })) {
+          matched.push(item)
         }
       }
     }
   } else if (typeof use === 'string') {
-    // loader
-    const item = { loader: use, rule, parent, isUseItem: false, isOneOf, siblings, index }
+    // loader、type
+    const loader = rule.type === use ? undefined : use
+    const item = { ...rule, loader, rule, parent, isUseItem: false, isOneOf, siblings, index }
     if (match({ ...item })) {
       matched.push(item)
     }
   } else if (typeof use === 'object') {
     // RuleSetLoader
-    const ruleSetLoader = use.loader
-    if (typeof ruleSetLoader === 'string') {
-      const item = {
-        loader: ruleSetLoader,
-        rule,
-        parent,
-        isUseItem: false,
-        isOneOf,
-        siblings,
-        index,
-      }
-      if (match({ ...item })) {
-        matched.push(item)
-      }
+    const item = {
+      ...use,
+      rule,
+      parent,
+      isUseItem: false,
+      isOneOf,
+      siblings,
+      index,
+    }
+    if (match({ ...item })) {
+      matched.push(item)
     }
   }
 
